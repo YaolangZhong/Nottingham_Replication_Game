@@ -1,0 +1,130 @@
+
+library(dplyr)
+library(lubridate)
+library(xtable)
+library(ggplot2)
+library(tidyr)
+
+## measures from Bloomberg
+load("data/bloomberg_uncertainty.RData")
+bb <- data %>% as_tibble %>%
+  arrange(date) %>%
+  rename(SWIV = USSN011) %>%
+  mutate(SWIV = SWIV/100, SRVIX = SRVIX/100, MOVE = MOVE/100)
+## TYVIX: 01/01/2002 discontinued 5/18/2020
+
+## mpu
+load("data/mpu10.RData")
+data <- mpu10 %>%
+  rename(mpu = mpu10, bpvol = bpvol10, normal = normal10) %>%
+  select(-f10, -normal)
+
+## Bundick's data
+bun <- read.csv("data/bundick.csv") %>% as_tibble %>%
+  mutate(date = make_date(year, month, day)) %>%
+  select(date, edx4q)
+
+## Swanson's data - Swanson and Williams
+swan <- read.delim("data/swanson.txt", header=FALSE) %>% as_tibble %>%
+  mutate(date = as.Date(V1, "%Y  %m  %d"),
+         swan = V4 - V2) %>%
+  na.omit %>%
+  select(date, swan)
+
+## TIV - 1982-2018, but from 2016-01-20 equal to TYVIX
+tiv <- read.csv("data/tiv.csv", na.strings="#N/A") %>% as_tibble %>%
+  rename(date = Date, TIV = TIV_10y) %>%
+  mutate(date = as.Date(date, format  = "%m/%d/%Y")) %>%
+  select(date, TIV)
+
+## combine data
+data <- data %>%
+  left_join(bun) %>%
+  left_join(swan) %>%
+  left_join(bb) %>%
+  left_join(tiv)
+
+## combine TIV and TYVIX
+data %>% select(date, TIV, TYVIX) %>%
+  filter(date < make_date(2016, 01, 20)) %>%
+  na.omit %>% with(cor(TIV, TYVIX))
+## from 2016/01/20 Philippe just used the TYVIX
+data %>% select(date, TIV, TYVIX) %>%
+  filter(date >= make_date(2016, 01, 20)) %>%
+  na.omit %>% with(cor(TIV, TYVIX))
+data$TIV <- rowMeans(cbind(data$TIV, data$TYVIX), na.rm=TRUE)
+data$TYVIX <- NULL
+
+# create the data matrix for all time series
+#selected_measures = data.frame(data$date, data$mpu, data$bpvol, data$MOVE, data$TIV)
+#selected_measures = data.frame(data$date, data$bpvol, data$MOVE, data$TIV)
+selected_measures = data.frame(data$date, data$mpu, data$bpvol, data$MOVE)
+selected_measures <- selected_measures[complete.cases(selected_measures), ]
+data_matrix = as.matrix(selected_measures[, -1])
+# standardize the data
+scaled_data_matrix = scale(data_matrix)
+
+# perform PCA
+# pca <- prcomp(scaled_data_matrix)
+pca <- prcomp(data_matrix)
+
+# determine the number of PCs to retain
+plot(pca)
+
+
+# extract the loadings and scores from the PCA
+loadings <- pca$rotation
+scores <- pca$x
+
+# compute the underlying time series
+# underlying_ts <- as.matrix(scaled_data_matrix) %*% loadings
+underlying_ts <- as.matrix(data_matrix) %*% loadings
+# remove missing values from the underlying time series
+complete_rows <- complete.cases(underlying_ts)
+underlying_ts <- underlying_ts[complete_rows, ]
+
+# save the first component of the PCA
+new_time_series = cbind(data.frame("date"=selected_measures[,1]), data.frame("PCA1" = -underlying_ts[, 1]))
+
+write.csv(new_time_series, file="data/PCA1.csv", row.names = FALSE)
+
+# plot all columns in the same figure
+matplot(data_matrix, type = 'l', lty = 1, col = 1:ncol(scaled_data_matrix),
+        xlab = "Time", ylab = "Value",
+        main = "Different Measures Before Scaling")
+lines(-underlying_ts[, 1], type = 'l', col = 'red')
+
+# plot all columns in the same figure
+matplot(scaled_data_matrix, type = 'l', lty = 1, col = 1:ncol(scaled_data_matrix),
+        xlab = "Time", ylab = "Value",
+        main = "Different Measures After Scaling")
+# plot the first three columns of underlying_ts
+lines(-underlying_ts[, 1], type = 'l', col = 'red')
+
+# plot all columns in the same figure
+matplot(-underlying_ts, type = 'l', lty = 1, col = 1:ncol(underlying_ts),
+        xlab = "Time", ylab = "Value",
+        main = "Different PCA components")
+
+
+
+# Fit the factor model with 2 factors using principal component analysis (PCA) rotation
+factor_model <- factanal(scaled_data_matrix, factors = 1, rotate = "principal")
+
+# Extract the factor loadings from the factor model
+loadings <- factor_model$loadings
+
+# Plot the time-series associated with each factor in the same graph
+ts_combined <- rep(NA, nrow(data))
+
+for (i in 1:ncol(loadings)) {
+  ts <- scaled_data_matrix %*% loadings[,i]
+  #lines(ts, type = 'l', col = i, lwd = 2)
+  ts_combined <- ifelse(is.na(ts_combined), ts, ts_combined + ts)
+}
+
+
+# Plot the combined time-series
+lines(scaled_data_matrix %*% loadings[,1], type = 'l', col = 'pink', lwd = 2, main = "Underlying Time Series PC1", xlab = "Time", ylab = "Value")
+# Plot the combined time-series
+lines(ts_combined, type = 'l', col = 'black', lwd = 2, main = "Underlying Time Series", xlab = "Time", ylab = "Value")

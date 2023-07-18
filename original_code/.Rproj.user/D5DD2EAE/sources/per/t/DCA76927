@@ -1,0 +1,26 @@
+{
+    "id": "DCA76927",
+    "path": "~/replication_game/3 replication package/PCA.R",
+    "project_path": "PCA.R",
+    "type": "r_source",
+    "hash": "519311227",
+    "contents": "",
+    "dirty": false,
+    "created": 1679139365446.0,
+    "source_on_save": false,
+    "relative_order": 5,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "93,50",
+        "scrollLine": "76"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1679151866,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1679151866214,
+    "read_only": false,
+    "read_only_alternatives": []
+}
