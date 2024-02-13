@@ -138,60 +138,35 @@ ggsave("output/figure_A2.pdf", width=6, height=4)
 
 
 ############### Synthesize ################
+selected_series = na.omit(data[,c('date','mpu', 'bpvol', 'edx4q', 'swan')]) %>%rename(SRU = mpu, BPV = bpvol, Bundick = edx4q, Swanson = swan)
 
 ####### PCA #########
-pca_series = na.omit(data[,c('mpu', 'edx4q', 'swan')]) %>%rename(SRU = mpu, Bundick = edx4q, Swanson = swan)
+pca_series = selected_series[, c('BPV', 'Bundick', 'Swanson')]
+# do PCA
 pca_result <- prcomp(pca_series)
-
 print(summary(pca_result))
 pca_components <- pca_result$x
 pca_loadings <- pca_result$rotation
-PC1 = -pca_components[, "PC1"]
-pca_data <- data %>%
-  select(date, mpu, edx4q, swan) %>%
-  na.omit() %>%
-  rename(SRU = mpu, Bundick = edx4q, Swanson = swan) %>%
-  cbind(PC1)
-
-# pivot the data to a longer format
-pdat <- pca_data %>%
-  pivot_longer(cols = -date, names_to = "series", values_to = "y")
-# plot
-global_min = min(pdat$y, na.rm = TRUE)
-global_max = max(pdat$y, na.rm = TRUE)
-ggplot(pdat) +
-  geom_line(aes(x=date, y=y, color=series)) +
-  theme_bw() +
-  theme(legend.position = c(0.8, 0.8),
-        legend.background = element_rect(colour="black"),
-        plot.margin=grid::unit(c(0,0,0,0), "mm"),
-        legend.title = element_blank()) +
-  scale_color_manual(values = c("black", "red", "chartreuse4", "blue")) +
-  ylim(global_min, global_max) +
-  xlab("") + ylab("Percent")
-
-ggsave("output/figure_A2_PCA.pdf", width=6, height=4)
+PCA = -pca_components[, "PC1"]
+PCA = PCA + mean(unlist(pca_series))
 
 ####### Factor Analysis #########
 # Prepare the data
 library(psych)
-factor_series <- na.omit(data[,c('mpu', 'edx4q', 'swan')])
+factor_series = selected_series[, c('BPV', 'Bundick', 'Swanson')]
 # Perform factor analysis
 factor_result <- psych::fa(factor_series, nfactors = 1)
 # Get factor scores
 factor_scores <- psych::factor.scores(factor_series, factor_result)$scores
-
+Factor1 = factor_scores[,1] + + mean(unlist(factor_series))
 # Bind the factor scores to the data
-factor_data <- data %>%
-  select(date, mpu, edx4q, swan) %>%
-  na.omit() %>%
-  rename(SRU = mpu, Bundick = edx4q, Swanson = swan) %>%
-  cbind(Factor1 = factor_scores[,1])
 
+plot_data = selected_series[, c('date', 'BPV', 'Bundick', 'Swanson')] %>% cbind(PCA, Factor1)
 
-# pivot the data to a longer format
-pdat <- factor_data %>%
+pdat <- plot_data %>%
   pivot_longer(cols = -date, names_to = "series", values_to = "y")
+pdat$series <- factor(pdat$series, levels = c("BPV", "Bundick", "Swanson", "PCA", "Factor1"))
+
 # plot
 global_min = min(pdat$y, na.rm = TRUE)
 global_max = max(pdat$y, na.rm = TRUE)
@@ -202,8 +177,31 @@ ggplot(pdat) +
         legend.background = element_rect(colour="black"),
         plot.margin=grid::unit(c(0,0,0,0), "mm"),
         legend.title = element_blank()) +
-  scale_color_manual(values = c("black", "red", "chartreuse4", "blue")) +
+  scale_color_manual(values = c("yellow", "green", "orange", "blue", "purple"),labels = c("BPV" = "BPV", "Bundick" = "Bundick", "Swanson" = "Swanson",  "PCA" = "PCA", "Factor1" = "FA")) +
   ylim(global_min, global_max) +
   xlab("") + ylab("Percent")
 
-ggsave("output/figure_A2_FA.pdf", width=6, height=4)
+
+ggsave("output/components.pdf", width=6, height=4)
+
+
+plot_data2 = selected_series[, c('date', 'SRU')] %>% cbind(PCA, Factor1)
+pdat <- plot_data2 %>%
+  pivot_longer(cols = -date, names_to = "series", values_to = "y")
+pdat$series <- factor(pdat$series, levels = c("SRU", "PCA", "Factor1"))
+
+# plot
+global_min = min(pdat$y, na.rm = TRUE)
+global_max = max(pdat$y, na.rm = TRUE)
+ggplot(pdat) +
+  geom_line(aes(x=date, y=y, color=series)) +
+  theme_bw() +
+  theme(legend.position = c(0.8, 0.8),
+        legend.background = element_rect(colour="black"),
+        plot.margin=grid::unit(c(0,0,0,0), "mm"),
+        legend.title = element_blank()) +
+  scale_color_manual(values = c("red", "blue", "purple"),labels = c("SRU" = "SRU", "PCA" = "PCA", "Factor1" = "FA")) +
+  ylim(global_min, global_max) +
+  xlab("") + ylab("Percent")
+
+ggsave("output/comparsion.pdf", width=6, height=4)
