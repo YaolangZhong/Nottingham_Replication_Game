@@ -3,6 +3,8 @@
 3_2_Trend: Section 3.2 Trend Analysis
  - tab2.m: a modified version of the tab2.m in the original code to be runnable in the Matlab v2021
 
+3_3_Uncertainty_Channel: Section 3.3 Uncertainty Channel
+ 
 3_4_Python: Section 3.4 Python Code with ChatGPT
  - fomc.ipynb
  - libor_ois.ipynb
